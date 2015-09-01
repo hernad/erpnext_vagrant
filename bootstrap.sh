@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+VAGRANT_HOME=/home/vagrant
+BENCH=erpnext-bench
+SITE=erpnext.local
+MYSQL_ROOT_PWD=root
+ADMIN_PWD=admin
+
 export DEBIAN_FRONTEND=noninteractive
 debconf-set-selections <<< "postfix postfix/mailname string `hostname`"
 debconf-set-selections <<< "postfix postfix/main_mailer_type string 'Internet Site'"
@@ -20,6 +26,13 @@ sudo apt-get install python-dev python-setuptools build-essential python-mysqldb
 echo "Installing wkhtmltopdf"
 wget http://download.gna.org/wkhtmltopdf/0.12/0.12.2.1/wkhtmltox-0.12.2.1_linux-precise-i386.deb
 dpkg -i wkhtmltox-0.12.2.1_linux-precise-i386.deb
+
+# nodejs
+curl -sL https://deb.nodesource.com/setup_0.12 | sudo bash -
+sudo apt-get install -y nodejs
+
+# bs
+sudo apt-get install -y language-pack-bs
 
 # setup mariadb conf
 config="
@@ -46,22 +59,27 @@ git clone https://github.com/frappe/bench bench-repo
 cd /vagrant
 sudo pip install -e bench-repo
 
-echo "Installing frappe-bench"
+echo "Installing erpnext-bench"
 cd /vagrant
 
-bench init frappe-bench
-
-cd /vagrant/frappe-bench
+cd $VAGRANT_HOME
+bench init $BENCH
+cd /home/vagrant/$BENCH
 bench get-app erpnext https://github.com/frappe/erpnext.git
-bench new-site site1.local --mariadb-root-password root --admin-password admin
-bench use site1.local
+bench new-site $SITE --mariadb-root-password $MYSQL_ROOT_PWD --admin-password $ADMIN_PWD
+bench use $SITE
 bench install-app erpnext
 
+bench setup socketio
+bench setup supervisor
+bench setup nginx
+bench setup redis-async-broker
+bench setup redis-cache
 bench setup procfile --with-watch
 
 EOF
 
 echo "Installed"
-
-echo "To start, use `vagrant ssh`, go to /vagrant/frappe-bench and run bench start"
+echo "To start console session run:  'vagrant ssh', then go to $VAGRANT_HOME/$BENCH and run bench start"
+echo "When then bench is started, run browser session on host: http://localhost:8080" 
 
