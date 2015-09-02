@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 
-VAGRANT_HOME=/home/vagrant
-BENCH=erpnext-bench
-SITE=erpnext.local
-MYSQL_ROOT_PWD=root
-ADMIN_PWD=admin
+. /etc/profile.d/vagrant.sh
+
+BENCH_HOME=${BENCH_HOME:-/home/vagrant}
+BENCH_NAME=${BENCH_NAME:-erpnext-bench}
+BENCH_GIT=${BENCH_GIT:-https://github.com/frappe/bench}
+MYSQL_ROOT_PWD=${MYSQL_ROOT_PWD:-root}
+FRAPPE_SITE=${FRAPPE_SITE:-erpnext.local}
+FRAPPE_ADMIN_PWD=${FRAPPE_ADMIN_PWD:-admin}
+ERPNEXT_GIT=${ERPNEXT_GIT:-https://github.com/frappe/erpnext.git}
+APT_INSTALL=${APT_INSTALL:-yes}
+
+
+apt_install() {
 
 export DEBIAN_FRONTEND=noninteractive
 debconf-set-selections <<< "postfix postfix/mailname string `hostname`"
@@ -50,24 +58,29 @@ echo "$config" > /etc/mysql/conf.d/barracuda.cnf
 sudo service mysql restart
 # mysqladmin -u root password root
 
+}
+
+[ "$APT_INSTALL" == "yes" ] && apt_install
+
+
 su vagrant << EOF
 
 whoami
 
-cd /vagrant
-git clone https://github.com/frappe/bench bench-repo
-cd /vagrant
+cd $BENCH_HOME
+echo BENCH_HOME=$BENCH_HOME, BENCH_GIT=$BENCH_GIT, APT_INSTALL=$APT_INSTALL, FRAPPE_GIT=$FRAPPE_GIT, pwd=$(pwd)
+git clone $BENCH_GIT bench-repo
 sudo pip install -e bench-repo
 
 echo "Installing erpnext-bench"
-cd /vagrant
 
-cd $VAGRANT_HOME
-bench init $BENCH
-cd /home/vagrant/$BENCH
-bench get-app erpnext https://github.com/frappe/erpnext.git
-bench new-site $SITE --mariadb-root-password $MYSQL_ROOT_PWD --admin-password $ADMIN_PWD
-bench use $SITE
+cd $BENCH_HOME
+bench init $BENCH_NAME
+cd $BENCH_HOME/$BENCH_NAME
+bench get-app erpnext $ERPNEXT_GIT
+
+bench new-site $FRAPPE_SITE --mariadb-root-password $MYSQL_ROOT_PWD --admin-password $FRAPPE_ADMIN_PWD
+bench use $FRAPPE_SITE
 bench install-app erpnext
 
 bench setup socketio
@@ -80,6 +93,6 @@ bench setup procfile --with-watch
 EOF
 
 echo "Installed"
-echo "To start console session run:  'vagrant ssh', then go to $VAGRANT_HOME/$BENCH and run bench start"
+echo "To start console session run:  'vagrant ssh', then go to $BENCH_HOME/$BENCH_NAME and run bench start"
 echo "When then bench is started, run browser session on host: http://localhost:8080" 
 
